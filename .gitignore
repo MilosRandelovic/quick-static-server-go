@@ -1,0 +1,6 @@
+# local folders
+.git
+.vscode
+
+# hidden macOS files
+.DS_Store
