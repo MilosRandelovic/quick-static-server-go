@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
 )
 
 func main() {
@@ -12,15 +13,25 @@ func main() {
 	directory := flag.String("d", ".", "Folder containing static files to serve")
 	flag.Parse()
 
-	http.Handle("/", http.FileServer(http.Dir(*directory)))
+	// Validate path
+	absolutePath, err := filepath.Abs(*directory)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	log.Printf("Serving %s on HTTP port: %s\n", *directory, *httpPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", *httpPort), logRequest(http.DefaultServeMux)))
+	// Using http.DefaultServeMux is not best practice, as it's globally scoped
+	// We will use a local mux instead (and DefaultServeMux is simply an instance of NewServeMux())
+	mux := http.NewServeMux()
+
+	mux.Handle("/", http.FileServer(http.Dir(absolutePath)))
+
+	log.Printf("Serving %s as http://localhost:%s\n", absolutePath, *httpPort)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", *httpPort), logEveryRequest(mux)))
 }
 
-func logRequest(handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s %s %s\n", r.RemoteAddr, r.Method, r.URL)
-		handler.ServeHTTP(w, r)
+func logEveryRequest(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		log.Printf("%s %s %s\n", request.RemoteAddr, request.Method, request.URL)
+		handler.ServeHTTP(writer, request)
 	})
 }
